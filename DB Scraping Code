@@ -1,0 +1,92 @@
+import pandas as pd 
+df = pd.read_excel(r'C:\Users\gunryang\Downloads\DB 구축 자료\code_data.xls') 
+df = df['종목코드'] 
+df2=df 
+
+for i in range(len(df)):
+    df2.iloc[i] = str(df.iloc[i]).zfill(6)
+
+df3 = df2[30:] # 종목스크래핑정도에 따라 슬라이싱 순서 정하기 
+
+
+########## selenium 
+from selenium import webdriver
+import time
+from selenium.webdriver.chrome.options import Options 
+from selenium.webdriver.common.keys import Keys
+
+options = Options()
+#options.add_argument('--kiosk') F11 이랑 동일한 기능
+
+ID = 'kthcy'
+PWD = 'wc2723ly'
+driver = webdriver.Chrome(executable_path=r'C:\Users\gunryang\Downloads\chromedriver_win32\chromedriver.exe', chrome_options=options)
+driver.set_window_size(1920,1080) # 창이 보여야지 셀레니옴이 작동하더라 
+driver.get("http://www.fnguide.com/")
+
+# 아이디 입력
+elem = driver.find_element_by_xpath('/html/body/div[2]/div/div[2]/div/form/fieldset/input[1]')
+elem.send_keys(ID)
+
+# 패스워드 입력
+elem= driver.find_element_by_xpath('/html/body/div[2]/div/div[2]/div/form/fieldset/input[2]')
+elem.send_keys(PWD)
+elem = driver.find_element_by_xpath('/html/body/div[2]/div/div[2]/div/form/fieldset/button')
+elem.click() # 로그인 버튼 누르기
+
+driver.implicitly_wait(5)
+time.sleep(3)
+
+# DB Navigator 들어가기 
+elem = driver.find_element_by_xpath('/html/body/div[2]/div/div[1]/ul/li[4]/a')
+elem.click()
+
+driver.implicitly_wait(5)
+time.sleep(2)
+
+# 유료구매가 된 경우에는 재무정보에 들어감
+elem = driver.find_element_by_xpath('//*[@id="container"]/div/div[1]/div[3]/div[4]/div[1]/ul/li[1]/a')
+elem.click()
+
+driver.implicitly_wait(5)
+time.sleep(3)
+
+
+
+YEAR = 'D'
+Quater = 'Q'
+code = '000990'
+a = ['10','20','30','40','99']
+
+for code in df4:
+    for i in a:
+        driver.get("https://www.google.com/")
+        driver.get("http://www.fnguide.com/Fgdd/FinIndivCompTrend#gicode=A" + code + "&conyn=1&termgb="+ YEAR + "&acntcode="+ i)
+        time.sleep(3)
+        try : 
+            elem = driver.find_element_by_xpath('//*[@id="btnExcel"]')
+            elem.click()
+        except Exception as e: # 아마도 오류종류는 NoSuchElementException
+            print('오류발생/ 오류내용 : ',e)
+            driver.get("https://www.google.com/")
+            driver.get("http://www.fnguide.com/Fgdd/FinIndivCompTrend#gicode=A" + code + "&conyn=1&termgb="+ YEAR + "&acntcode="+ i)
+            time.sleep(5)
+            elem = driver.find_element_by_xpath('//*[@id="btnExcel"]')
+            elem.click()
+        time.sleep(3)
+        
+    for j in a:
+        driver.get("https://www.google.com/")
+        driver.get("http://www.fnguide.com/Fgdd/FinIndivCompTrend#gicode=A" + code + "&conyn=1&termgb="+ Quater + "&acntcode="+ j)
+        time.sleep(3)
+        try:
+            elem = driver.find_element_by_xpath('//*[@id="btnExcel"]')
+            elem.click()
+        except Exception as e: 
+            print('오류발생/ 오류내용 : ',e)
+            driver.get("https://www.google.com/")
+            driver.get("http://www.fnguide.com/Fgdd/FinIndivCompTrend#gicode=A" + code + "&conyn=1&termgb="+ Quater + "&acntcode="+ j)
+            time.sleep(5)
+            elem = driver.find_element_by_xpath('//*[@id="btnExcel"]')
+            elem.click()
+        time.sleep(3)
