@@ -1,0 +1,25 @@
+def get_stochastic2(df,n=15,m=5,t=3):
+
+    #df = pd.DataFrame(df)
+    
+    #n일중 최고가
+    ndays_high = df.high.rolling(window=n, min_periods=1).max()
+
+    #n일중 최저가 
+    ndays_low = df.low.rolling(window=n, min_periods=1).min()
+
+    
+
+    #Fast%K 계산
+    Fast_k = ((df.close - ndays_low)/(ndays_high-ndays_low))*100
+
+    #Fast%D (=Slow%K) 계산
+    Slow_k = Fast_k.rolling(window=m).mean()
+
+    # Slow %D 계산
+    Slow_d = Slow_k.rolling(window=t).mean()
+
+    # assign 함수는 데이터프레임에 컬럼추가하는 함수이고, 처음이 열이름, =다음이 열내용이 들어간다. 
+    df = df.assign(Fast_k=Fast_k,Slow_k=Slow_k,Slow_d=Slow_d).dropna()
+
+    return df
