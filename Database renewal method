@@ -1,0 +1,45 @@
+# 첫번째 방안은 for 문을 돌려서 일일히 바꿔주는 방법
+# 초기에 인덱스를 바꿔서 지정하는 경우에 이방법을 따른다. 
+
+import sqlite3
+import pandas as pd
+import numpy as np
+
+con = sqlite3.connect("c:/Users/gunryang/stock.db")
+df = pd.read_sql("SELECT * FROM future", con,index_col=None )
+
+df['date'] = pd.to_datetime(df['date']) #기존에 str 형태로 데이터 베이스에 저장되었음으로 이것을 다시 데이트타임형태로 바꿈
+df=df.set_index('date') # 이컬럼을 인덱스로 설정
+df2= df[:50] # 샘플1
+df3 = df[25:75] # 샘플2
+
+df_final = pd.merge(df2,df3,how='outer',right_index=True, left_index=True, suffixes=('_x','_y')) # 합치기
+# 옆으로 합치기 때문에 Nan 값이 생성됨
+
+for row in range(len(df_final)): # 각 컬럼에 대한 비교를 통해 (x, y) 값을 Nan 값을 병합값으로 대체해줌
+    if np.isnan(df_final['open_x'].iloc[row]) and np.isnan(df_final['open_y'].iloc[row])==False:
+        df_final['open_x'].iloc[row] = df_final['open_y'].iloc[row]
+    if np.isnan(df_final['high_x'].iloc[row]) and np.isnan(df_final['high_y'].iloc[row])==False:
+        df_final['high_x'].iloc[row] = df_final['high_y'].iloc[row]
+    if np.isnan(df_final['low_x'].iloc[row]) and np.isnan(df_final['low_y'].iloc[row])==False:
+        df_final['low_x'].iloc[row] = df_final['low_y'].iloc[row]
+    if np.isnan(df_final['close_x'].iloc[row]) and np.isnan(df_final['close_y'].iloc[row])==False:
+        df_final['close_x'].iloc[row] = df_final['close_y'].iloc[row]
+    if np.isnan(df_final['volume_x'].iloc[row]) and np.isnan(df_final['volume_y'].iloc[row])==False:
+        df_final['volume_x'].iloc[row] = df_final['volume_y'].iloc[row]
+        
+df_final = df_final[['open_x','high_x','low_x','close_x','volume_x']] # x 서픽스로 값을 몰아주었고 y서픽스 컬럼은 버림
+df_final.columns=['open','high','low','close','volume'] # 컬럼이름 재지정
+###################################    df_final 통합 완성 ############################################
+
+# 더 간단한 방법 / 초기에 인덱스를 디폴트로 시작하면 됨
+con = sqlite3.connect("c:/Users/gunryang/stock.db")
+df = pd.read_sql("SELECT * FROM future", con,index_col=None )
+df2= df[:50] #샘플1
+df3 = df[25:75] #샘플2
+df4 = pd.merge(df2,df3,how='outer')
+df4['date'] = pd.to_datetime(df4['date'])
+df5 = df4.set_index('date') # 최종 데이터 프레임
+df5.to_sql('final', con)
+
+# 데이터베이스 sqlite3 상태에서 if_exist = 'append' 를 활용하면 중복에 대한 검사가 불가능하여 중복된 값이 들어간다. 
