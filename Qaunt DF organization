@@ -1,0 +1,54 @@
+# 파일디렉토리 연결, 로데이터 정리 코드
+import os
+import pandas as pd
+
+path = r'C:\Users\Gunryang\Downloads\DB임시저장'
+
+file_list = os.listdir(path)
+file_list
+
+path2 = 'C:\\Users\\Gunryang\\Downloads\\DB임시저장' +'\\' + file_list[0]
+a= pd.read_excel(path2,index_col=0)
+# 여기까지가 디렉토리에서 불러오는 과정
+================================================================================================================
+
+#fnguide 엑셀자료 전처리 과정
+
+import pandas as pd
+
+def strip_function(x):
+    x=str(x)
+    x = x.strip(' ')
+    return x
+
+excel = pd.read_excel(r'C:\Users\Gunryang\Desktop\DB하이텍_인자정리 완료.xlsx')
+excel[excel.columns[0]] = excel[excel.columns[0]].apply(strip_function)
+#excel 은 데이터프레임을 의미
+
+excel = excel.set_index(excel.columns[0])
+excel = excel.iloc[7:]
+
+#column 이름을 적절하게 변경하는 코딩
+
+column_name = list(excel.iloc[0])
+column_name2=[]
+for date in column_name:
+    if date =='단위':
+        column_name2.append('단위')
+    else:
+        date = date.split('_')[0].replace('.','/')
+        column_name2.append(date)
+
+
+excel.columns = column_name2 # 컬럼이름 변경완료 
+excel = excel[column_name2[1:]]
+
+factor_list = ['부채비율','순차입금비율','유동비율','당좌비율','이자보상배율','영업이익률','ROA(당기순이익)','ROA(당기순이익,3년평균)','ROE(지배주주순이익)','ROE(지배주주순이익,3년평균)','ROE(지배주주순이익,직전4분기)','ROIC','총자산회전율','매출채권회전율','재고자산회전율',' EPS(직전4분기)','BPS','수정EPS(직전4분기)','수정BPS','PER(직전4분기)','PBR','PSR','PSR(연율화)','PCR(연율화)','수정PER(직전4분기)','수정PBR','수정PSR(연율화)','수정PCR(연율화)','EV/EBITDA(직전4분기)','시가총액/EBITDA(직전4분기)','총현금흐름','총현금흐름(직전4분기)','총자산','총부채','총자본','지배주주지분','매출액','매출액(직전4분기)','영업이익','영업이익(직전4분기)','이자비용(비영업)','지배주주순이익','지배주주순이익(직전4분기)','지배주주순이익(보통)','영업활동으로인한현금흐름','영업활동으로인한현금흐름(직전4분기)','이자비용','투자활동으로인한현금흐름','재무활동으로인한현금흐름']
+excel_final = excel.loc[factor_list]
+excel_final
+#이 전체 데이터 베이스에서 재무제표 재무비율 투자지표 등으로 쪼개야 나중에 임포트시에 부하가 많이 안걸릴듯 하다. 
+# 여기서부터는 재무제표 책부분과 동기화 시켜야함 
+
+
+
+
