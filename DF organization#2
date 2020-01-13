@@ -31,9 +31,13 @@ def make_fs_allData(path):
     
     file_list = os.listdir(path)
     for num,file in enumerate(file_list):
+        
+            
         path2 = 'C:\\Users\gunryang\\Desktop\\DF_organization_example' +'\\' + file
         excel= pd.read_excel(path2)
         excel[excel.columns[0]] = excel[excel.columns[0]].apply(strip_function)
+        if excel.iloc[4]['Unnamed: 0'].split(':')[1].strip(' ')!='분기' or excel.iloc[5]['Unnamed: 0'].split(':')[1].strip(' ')!='재무비율':
+            continue
         code = excel.iloc[2]['Unnamed: 0'].split(':')[1].strip(' ') # 코드이름추출
         #excel 은 데이터프레임을 의미
 
@@ -72,4 +76,5 @@ def make_fs_allData(path):
         
 path = r'C:\Users\gunryang\Desktop\DF_organization_example'        
 make_fs_allData(path)    
+    
     
