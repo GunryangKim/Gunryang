@@ -1,0 +1,202 @@
+#재무제표 데이터에 대한 여러종목 합치는 함수
+import pandas as pd
+import os
+
+# 재무제표 데이터 형태 바꾸기 함수
+def change_df(firm_code,dataframe):
+    for num, col in enumerate(dataframe.columns):
+        temp_df = pd.DataFrame({firm_code:dataframe[col]})
+        temp_df = temp_df.T
+        temp_df.columns = [[col]*len(dataframe),temp_df.columns]
+        
+        if num==0:
+            total_df = temp_df
+        else:
+            total_df = pd.merge(total_df,temp_df,how='outer',right_index=True,left_index=True)
+    return total_df
+
+
+# 컬럼 이름 정리 함수
+def strip_function(x):
+    x=str(x)
+    x = x.strip(' ')
+    return x
+
+
+# 함수에 입력할 경로 선정
+path = r'C:\Users\gunryang\Desktop\DF_organization_example'
+
+# 최종 함수 
+def make_fs_allData(path):
+    
+    file_list = os.listdir(path)
+    for num,file in enumerate(file_list):
+        
+            
+        path2 = 'C:\\Users\gunryang\\Desktop\\DF_organization_example' +'\\' + file
+        excel= pd.read_excel(path2)
+        excel[excel.columns[0]] = excel[excel.columns[0]].apply(strip_function)
+        if excel.iloc[4]['Unnamed: 0'].split(':')[1].strip(' ')!='분기' or excel.iloc[5]['Unnamed: 0'].split(':')[1].strip(' ')!='재무비율':
+            continue
+        code = excel.iloc[2]['Unnamed: 0'].split(':')[1].strip(' ') # 코드이름추출
+        #excel 은 데이터프레임을 의미
+
+        excel = excel.set_index(excel.columns[0])
+        excel = excel.iloc[7:]
+
+        #column 이름을 적절하게 변경하는 코딩
+
+        column_name = list(excel.iloc[0])
+        column_name2=[]
+        for date in column_name:
+            if date =='단위':
+                column_name2.append('단위')
+            else:
+                date = date.split('_')[0].replace('.','/')
+                column_name2.append(date)
+
+
+        excel.columns = column_name2 # 컬럼이름 변경완료 
+        excel = excel[column_name2[1:]]
+
+        factor_list = ['부채비율','순차입금비율','유동비율','당좌비율','이자보상배율','영업이익률','ROA(당기순이익)','ROA(당기순이익,3년평균)','ROE(지배주주순이익)','ROE(지배주주순이익,3년평균)','ROE(지배주주순이익,직전4분기)','ROIC','총자산회전율','매출채권회전율','재고자산회전율','EPS(직전4분기)','BPS','수정EPS(직전4분기)','수정BPS','PER(직전4분기)','PBR','PSR','PSR(연율화)','PCR(연율화)','수정PER(직전4분기)','수정PBR','수정PSR(연율화)','수정PCR(연율화)','EV/EBITDA(직전4분기)','시가총액/EBITDA(직전4분기)','총현금흐름','총현금흐름(직전4분기)','총자산','총부채','총자본','지배주주지분','매출액','매출액(직전4분기)','영업이익','영업이익(직전4분기)','이자비용(비영업)','지배주주순이익','지배주주순이익(직전4분기)','지배주주순이익(보통)','영업활동으로인한현금흐름','영업활동으로인한현금흐름(직전4분기)','이자비용','투자활동으로인한현금흐름','재무활동으로인한현금흐름']
+        excel_final = excel.loc[factor_list] # 전체에 대한 데이터 모은 데이터프레임
+        
+        # 재무제표 쪽 데이터만 여러종목에 대해서 모으기 ( 재무비율, 투자지표 관련 데이터 프레임을 만들시 이이하의 부분만 바꾸면 된다)
+        #재무제표 관련 지표 리스트
+        fs_list = ['총현금흐름','총현금흐름(직전4분기)','총자산','총부채','총자본','지배주주지분','매출액','매출액(직전4분기)','영업이익','영업이익(직전4분기)','이자비용(비영업)','지배주주순이익','지배주주순이익(직전4분기)','지배주주순이익(보통)','당기순이익','당기순이익(직전4분기)','영업활동으로인한현금흐름','영업활동으로인한현금흐름(직전4분기)','이자비용','투자활동으로인한현금흐름','재무활동으로인한현금흐름']
+        fs_data = excel_final.loc[fs_list]
+        fs_df_changed = change_df(code,fs_data)
+        
+        if num==0:
+            total_fs = fs_df_changed
+        else:
+            total_fs = pd.concat([total_fs,fs_df_changed])
+    return total_fs
+        
+path = r'C:\Users\gunryang\Desktop\DF_organization_example'        
+make_fs_allData(path)    
+    
+    
+################################################################################################################
+
+#재무비율 데이터 전처리과정
+def make_fr_allData(path):
+    
+    file_list = os.listdir(path)
+    for num,file in enumerate(file_list):
+        
+            
+        path2 = 'C:\\Users\gunryang\\Desktop\\DF_organization_example' +'\\' + file
+        excel= pd.read_excel(path2)
+        excel[excel.columns[0]] = excel[excel.columns[0]].apply(strip_function)
+        if excel.iloc[4]['Unnamed: 0'].split(':')[1].strip(' ')!='분기' or excel.iloc[5]['Unnamed: 0'].split(':')[1].strip(' ')!='재무비율':
+            continue
+        code = excel.iloc[2]['Unnamed: 0'].split(':')[1].strip(' ') # 코드이름추출
+        #excel 은 데이터프레임을 의미
+
+        excel = excel.set_index(excel.columns[0])
+        excel = excel.iloc[7:]
+
+        #column 이름을 적절하게 변경하는 코딩
+
+        column_name = list(excel.iloc[0])
+        column_name2=[]
+        for date in column_name:
+            if date =='단위':
+                column_name2.append('단위')
+            else:
+                date = date.split('_')[0].replace('.','/')
+                column_name2.append(date)
+
+
+        excel.columns = column_name2 # 컬럼이름 변경완료 
+        excel = excel[column_name2[1:]]
+
+        factor_list = ['부채비율','순차입금비율','유동비율','당좌비율','이자보상배율','영업이익률','ROA(당기순이익)','ROA(당기순이익,3년평균)','ROE(지배주주순이익)','ROE(지배주주순이익,3년평균)','ROE(지배주주순이익,직전4분기)','ROIC','총자산회전율','매출채권회전율','재고자산회전율','EPS(직전4분기)','BPS','수정EPS(직전4분기)','수정BPS','PER(직전4분기)','PBR','PSR','PSR(연율화)','PCR(연율화)','수정PER(직전4분기)','수정PBR','수정PSR(연율화)','수정PCR(연율화)','EV/EBITDA(직전4분기)','시가총액/EBITDA(직전4분기)','총현금흐름','총현금흐름(직전4분기)','총자산','총부채','총자본','지배주주지분','매출액','매출액(직전4분기)','영업이익','영업이익(직전4분기)','이자비용(비영업)','지배주주순이익','지배주주순이익(직전4분기)','지배주주순이익(보통)','영업활동으로인한현금흐름','영업활동으로인한현금흐름(직전4분기)','이자비용','투자활동으로인한현금흐름','재무활동으로인한현금흐름']
+        excel_final = excel.loc[factor_list] # 전체에 대한 데이터 모은 데이터프레임
+        
+        # 재무제표 쪽 데이터만 여러종목에 대해서 모으기 ( 재무비율, 투자지표 관련 데이터 프레임을 만들시 이이하의 부분만 바꾸면 된다)
+        #재무비율 관련 지표 리스트
+        fr_list = ['부채비율','순차입금비율','유동비율','당좌비율','이자보상배율','영업이익률','ROA(당기순이익)','ROA(당기순이익,3년평균)','ROE(지배주주순이익)','ROE(지배주주순이익,3년평균)','ROE(지배주주순이익,직전4분기)','ROIC','총자산회전율','매출채권회전율','재고자산회전율']
+        fr_data = excel_final.loc[fr_list]
+        
+        # 이부분은 재무비율 평균 ROA 및 평균 ROE 값을 뽑기위한 코드
+        fr_data = fr_data.T
+        fr_data = fr_data.sort_index()
+        fr_data['ROA(평균)']=fr_data['ROA(당기순이익)'].rolling(window=4).mean()
+        fr_data['ROE(평균)']=fr_data['ROE(지배주주순이익)'].rolling(window=4).mean()
+        fr_data = fr_data.T
+        
+        # 이후 부분은 재무제표와 동일
+        fr_df_changed = change_df(code,fr_data)
+        
+        if num==0:
+            total_fr = fr_df_changed
+        else:
+            total_fr = pd.concat([total_fr,fr_df_changed])
+    return total_fr
+    
+path = r'C:\Users\gunryang\Desktop\DF_organization_example'        
+a= make_fr_allData(path)       
+####################################################################################################################### 
+
+#투자지표 데이터 전처리과정
+def make_invest_allData(path):
+    
+    file_list = os.listdir(path)
+    for num,file in enumerate(file_list):
+        
+            
+        path2 = 'C:\\Users\gunryang\\Desktop\\DF_organization_example' +'\\' + file
+        excel= pd.read_excel(path2)
+        excel[excel.columns[0]] = excel[excel.columns[0]].apply(strip_function)
+        if excel.iloc[4]['Unnamed: 0'].split(':')[1].strip(' ')!='분기' or excel.iloc[5]['Unnamed: 0'].split(':')[1].strip(' ')!='재무비율':
+            continue
+        code = excel.iloc[2]['Unnamed: 0'].split(':')[1].strip(' ') # 코드이름추출
+        #excel 은 데이터프레임을 의미
+
+        excel = excel.set_index(excel.columns[0])
+        excel = excel.iloc[7:]
+
+        #column 이름을 적절하게 변경하는 코딩
+
+        column_name = list(excel.iloc[0])
+        column_name2=[]
+        for date in column_name:
+            if date =='단위':
+                column_name2.append('단위')
+            else:
+                date = date.split('_')[0].replace('.','/')
+                column_name2.append(date)
+
+
+        excel.columns = column_name2 # 컬럼이름 변경완료 
+        excel = excel[column_name2[1:]]
+
+        factor_list = ['부채비율','순차입금비율','유동비율','당좌비율','이자보상배율','영업이익률','ROA(당기순이익)','ROA(당기순이익,3년평균)','ROE(지배주주순이익)','ROE(지배주주순이익,3년평균)','ROE(지배주주순이익,직전4분기)','ROIC','총자산회전율','매출채권회전율','재고자산회전율','EPS(직전4분기)','BPS','수정EPS(직전4분기)','수정BPS','PER(직전4분기)','PBR','PSR','PSR(연율화)','PCR(연율화)','수정PER(직전4분기)','수정PBR','수정PSR(연율화)','수정PCR(연율화)','EV/EBITDA(직전4분기)','시가총액/EBITDA(직전4분기)','총현금흐름','총현금흐름(직전4분기)','총자산','총부채','총자본','지배주주지분','매출액','매출액(직전4분기)','영업이익','영업이익(직전4분기)','이자비용(비영업)','지배주주순이익','지배주주순이익(직전4분기)','지배주주순이익(보통)','영업활동으로인한현금흐름','영업활동으로인한현금흐름(직전4분기)','이자비용','투자활동으로인한현금흐름','재무활동으로인한현금흐름']
+        excel_final = excel.loc[factor_list] # 전체에 대한 데이터 모은 데이터프레임
+        
+        # 재무제표 쪽 데이터만 여러종목에 대해서 모으기 ( 재무비율, 투자지표 관련 데이터 프레임을 만들시 이이하의 부분만 바꾸면 된다)
+        #투자지표 관련 지표 리스트
+        invest_list = ['EPS(직전4분기)','BPS','수정EPS(직전4분기)','수정BPS','PER(직전4분기)','PBR','PSR','PSR(연율화)','PCR(연율화)','수정PER(직전4분기)','수정PBR','수정PSR(연율화)','수정PCR(연율화)','EV/EBITDA(직전4분기)','시가총액/EBITDA(직전4분기)','총현금흐름','총현금흐름(직전4분기)','영업활동으로인한현금흐름','영업활동으로인한현금흐름(직전4분기)','투자활동으로인한현금흐름','재무활동으로인한현금흐름']
+        invest_data = excel_final.loc[invest_list]
+        
+        # 이부분은 재무비율 평균 ROA 및 평균 ROE 값을 뽑기위한 코드
+        #fr_data = fr_data.T
+        #fr_data = fr_data.sort_index()
+        #fr_data['ROA(평균)']=fr_data['ROA(당기순이익)'].rolling(window=4).mean()
+        #fr_data['ROE(평균)']=fr_data['ROE(지배주주순이익)'].rolling(window=4).mean()
+        #fr_data = fr_data.T
+        
+        # 이후 부분은 재무제표와 동일
+        invest_df_changed = change_df(code,invest_data)
+        
+        if num==0:
+            total_invest = invest_df_changed
+        else:
+            total_invest = pd.concat([total_invest,invest_df_changed])
+    return total_invest
+    
+path = r'C:\Users\gunryang\Desktop\DF_organization_example'        
+a= make_invest_allData(path)   
