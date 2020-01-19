@@ -1,0 +1,199 @@
+# -*- coding: utf-8 -*-
+
+
+
+
+#함수사용전에 명심할 내용( 전처리 필수과정)
+
+ #각 자료를 먼저 전처리된 데이터프레임형태로 변환
+#fs_path = r'C:\Users\Gunryang\Quant_Python\재무제표데이터.xlsx'
+#fs_df = get_finance_data(fs_path)   재무제표 데이터
+#fr_path = r'C:\Users\Gunryang\Quant_Python\재무비율데이터.xlsx'
+#fr_df = get_finance_data(fr_path)   재무비율 데이터
+#invest_path = r'C:\Users\Gunryang\Quant_Python\투자지표데이터.xlsx'
+#invest_df= get_finance_data(invest_path)  투자지표 데이터 
+
+#price_path = r'C:\Users\Gunryang\Quant_Python\가격데이터_Origin.xlsx'
+#price_df = pd.read_excel(price_path,index_col=0)  가격데이터                         
+
+
+
+import pandas as pd
+import numpy as np
+
+
+# 재무관련 데이터 전처리하는 함수
+# 재무관련 데이터 전처리하는 함수
+def get_finance_data(path):
+    data_path = path
+    raw_data = pd.read_excel(data_path,index_col=0)
+    big_col = list(raw_data.columns) # 상위컬럼을 리스트로 저장
+    small_col = list(raw_data.iloc[0])
+    
+    new_big_col=[] # 상위컬럼의 na 부분을 없애주기 위해 새로운 공간을 생성
+    for num,col in enumerate(big_col):
+        if 'Unnamed' in col:
+            new_big_col.append(new_big_col[num-1])
+        else:
+            new_big_col.append(big_col[num])
+            
+    raw_data.columns = [new_big_col,small_col]
+    clean_df =  raw_data.loc[raw_data.index.dropna()]
+    clean_df = clean_df.groupby(level=0).first()# 중복값 제거하고 첫번째 중복값만 살려두기
+    # 인덱스의 중복여부 확인하고 싶으면 clean_df.index.is_unique 값이 True 면 중복없음
+    
+    return clean_df
+
+
+#N/A(IFRS) 및 완전잠식 을 NAN 으로 바꾸기 함수
+def check_IFRS_Impaired(x):
+    #완전잠식 및 N/A(IFRS) 표현 변환함수
+    if x =='N/A(IFRS)':
+        return np.NaN
+    if x=='완전잠식':
+        print('완전잠식, 주의요망')
+        return np.NaN
+    else:
+        return x
+
+#예시 fr_df[('2014/12','ROA')]=fr_df[('2014/12','ROA')].apply(check_IFRS)
+
+
+# 지난분기 날짜 구하는 함수 , 리턴은 str형이다. 
+def last_quarter_decision(x):
+    date_list = x.split('/')
+    day = int(date_list[1]) - 3
+    if day <= 0:
+        month = int(date_list[0])-1
+        day = day+12
+        return str(month) +'/' +str(day)
+    else:
+        month = date_list[0]
+        day = day
+        return str(month) +'/' + '0' +str(day)
+
+
+
+
+# PER 기준으로 오름차순 정렬하는 함수 
+def low_per(invest_df,index_date,index_name='수정PER(직전4분기)',num=None):
+# invest_df : 정렬하고자하는 데이터프레임, index_date : 정렬하고자하는 날짜컬럼, num: 상위 PER  주식반환개수
+    invest_df[(index_date,index_name)] = pd.to_numeric(invest_df[(index_date,index_name)]) # 칼럼내의 값중 숫자가 아닌것을 숫자로 변환함
+    per_sorted = invest_df.sort_values(by=(index_date,index_name)) # 해당 이중컬럼기준으로 오름차순으로 정렬
+    return per_sorted[index_date][:num] #이중컬럼이므로 두개의 대괄호가 들어감, num 인자를 통해 상위 PER 의 주식수만 반환
+
+
+#ROA 기준으로 내림차순 정렬하는 함수
+def high_roa(fr_df,index_date,index_name='ROA(평균)',num=None):
+    # fr_df : 해당 데이터 베이스, index_date: 정렬기준 날짜, num: 상위 roa 순으로 반환하고자하는 주식의 수
+    fr_df[(index_date,index_name)] = fr_df[(index_date,index_name)].apply(check_IFRS_Impaired)
+    fr_df[(index_date,index_name)] = pd.to_numeric(fr_df[(index_date,index_name)])
+    sorted_roa = fr_df.sort_values(by=(index_date,index_name),ascending=False)
+    return sorted_roa[index_date][:num]
+
+
+# 마법공식 함수로 만들기 ( 지표기준 --> 저PER, 고 ROA)
+# 리턴하는 것은 저PER, 고ROA 를 가지는 종목을 원하는 갯수만큼 반환
+def magic_formula(fr_df,invest_df,index_date,fr_index='ROA(평균)',invest_index='수정PER(직전4분기)',num=None):
+    per = low_per(invest_df,index_date,invest_index,None)
+    roa = high_roa(fr_df,index_date,fr_index,None)
+    per['per순위'] = per[invest_index].rank()
+    roa['roa순위'] = roa[fr_index].rank(ascending=False)
+    magic = pd.merge(per,roa,how='outer',left_index=True,right_index=True)
+    magic['마법공식순위'] = ( magic['per순위'] +magic['roa순위'] ).rank().sort_values()
+    magic = magic.sort_values(by='마법공식순위')
+    return magic[:num]
+
+
+
+# 저평가된 지수를 기준으로 정렬하여 순위 만들어 주는 함수
+def get_value_rank(invest_df,value_type,index_date,num):
+    # invest_df :투자지표 / value_type : 투자지표 종류선택(ex:per) / index_date : 정렬 기준날짜 / num : 상위 주식개수
+    invest_df[(index_date,value_type)] = pd.to_numeric(invest_df[(index_date,value_type)]) # 칼럼의 값을 모두 숫자형태로 변환
+    value_sorted = invest_df.sort_values(by=(index_date,value_type))[index_date] # 해당날짜컬럼과 투자지표를 기준으로 정렬후 해당날짜만 저장
+    value_sorted[value_type +'순위'] = value_sorted[value_type].rank() # 해당날짜만 저장된 데이터프레임기준으로 해당지표에 대한 랭킹컬럼생성
+    return value_sorted[[value_type,value_type + '순위']][:num] #해당지표, 지표순위를 상위갯수 지정후 반환
+
+
+
+# 저평가지수들 지표 조합 함수
+def make_value_combo(value_list,invest_df,index_date,num):
+    for i,value in enumerate(value_list): # value 는 각 지표를 가리킨다.
+        temp_df = get_value_rank(invest_df,value,index_date,None)
+        if i==0: # 맨처음인경우
+            value_combo_df = temp_df # get_value_rank 함수에 의해 생성된 데이터 프레임
+            rank_combo = temp_df[value + '순위'] # 순위만을 계산하는 데이터프레임 생성
+        else: # 두번째 이후 루프인경우
+            value_combo_df = pd.merge(value_combo_df,temp_df,how='outer',right_index=True,left_index=True) # 각 지표에 대한 데이터프레임을 연결시킴
+            rank_combo = rank_combo +temp_df[value +'순위'] # 각 지표에 대한 순위를 더해서 종합순위를 구하는 데이터프레임 유지, 여기서 판다스가 알아서  공통인덱스에 대해 계산을 수행해준다. 
+            
+    value_combo_df['종합순위'] = rank_combo.rank() # 종합순위만을 저장했던 데이터프레임을  기존 데이터프레임에 저장
+    value_combo_df = value_combo_df.sort_values(by='종합순위')
+    return value_combo_df[:num]
+
+
+# F-score 기법을 활용한 , 3가지 조건 만족하는 종목 반환
+def get_fscore(fs_df,index_date,num): # fs_df 데이터 프레임, index_date : 기준날짜, num : 상위반환종목개수
+    fscore_df = fs_df[index_date]
+    fscore_df['당기순이익점수'] = fscore_df['당기순이익']>0
+    fscore_df['영업활동점수'] = fscore_df['영업활동으로인한현금흐름']>0
+    fscore_df['더큰영업활동점수'] = fscore_df['영업활동으로인한현금흐름']>fscore_df['당기순이익']
+    fscore_df['종합점수'] = fscore_df[['당기순이익점수','영업활동점수','더큰영업활동점수']].sum(axis=1)
+    fscore_df = fscore_df[fscore_df['종합점수']==3] # 3이 되는 값들을 가진 fscore_df 를 다시 재저장(필터링함)
+    return fscore_df[:num]
+
+# F-score 기법을 활용한 , 9가지 조건 만족하는 종목 반환
+def get_fscore_all(fs_df,fr_df,index_date,num): # fs_df 데이터 프레임, index_date : 기준날짜, num : 상위반환종목개수
+    fscore_df = fs_df[index_date]
+    last_quarter = last_quarter_decision(index_date)
+    fscore_df2 = fr_df[index_date] # 비율관련 
+    fscore_df3 = fr_df[last_quarter]
+    fscore_df['당기순이익점수'] = fscore_df['당기순이익(직전4분기)']>0 # 당기순이익 0이상인가?
+    fscore_df['영업활동점수'] = fscore_df['영업활동으로인한현금흐름(직전4분기)']>0 # 영업현금흐름이 0이상인가?
+    fscore_df['더큰영업활동점수'] = fscore_df['영업활동으로인한현금흐름(직전4분기)']>fscore_df['당기순이익(직전4분기)'] #영업현금흐름이 순이익보다 높은가?
+    fscore_df['부채비율점수'] = pd.to_numeric(fscore_df2['부채비율'].apply(check_IFRS_Impaired)) - pd.to_numeric(fscore_df3['부채비율'].apply(check_IFRS_Impaired))<0 #부채비율이 전분기 대비 감소여부
+    fscore_df['유동비율점수'] = pd.to_numeric(fscore_df2['유동비율'].apply(check_IFRS_Impaired)) - pd.to_numeric(fscore_df3['유동비율'].apply(check_IFRS_Impaired))>=0 # 유동비율 증가 여부
+    
+    
+    fscore_df['ROA점수'] = (pd.to_numeric(fscore_df2['ROA(당기순이익,3년평균)'].apply(check_IFRS_Impaired)) - pd.to_numeric(fscore_df3['ROA(당기순이익,3년평균)'].apply(check_IFRS_Impaired)))  > 0 
+    fscore_df['ROA점수2'] = (pd.to_numeric(fscore_df2['ROA(평균)'].apply(check_IFRS_Impaired)) - pd.to_numeric(fscore_df3['ROA(평균)'].apply(check_IFRS_Impaired)))  > 0
+    fscore_df['최종ROA점수'] = np.logical_or(fscore_df['ROA점수'] , fscore_df['ROA점수2'] )
+    # ROA 값이 증가여부 , 이지표에 대해서 아직 확신히 없기에 두가지 지표 중 하나를 택하도록 하였다. 두개를 사용하려면 np.logical_or 을 사용해야할듯 
+    #fscore_df['매출총이익점수'] = fscore_df['매출총이익'] - fscore_df[(last_quarter'매출총이익')]>0 #매출총이익 증가여부 , 아직 DF 업데이트 필요
+    fscore_df['총자산회전율점수'] = pd.to_numeric(fscore_df2['총자산회전율'].apply(check_IFRS_Impaired)) - pd.to_numeric(fscore_df3['총자산회전율'].apply(check_IFRS_Impaired))>=0 # 유동비율 증가 여부
+    fscore_df['종합점수'] = fscore_df[['당기순이익점수','영업활동점수','더큰영업활동점수','부채비율점수','유동비율점수','최종ROA점수','총자산회전율점수']].sum(axis=1)
+    fscore_df = fscore_df[fscore_df['종합점수']>=3] # 3이상이 되는 값들을 가진 fscore_df 를 다시 재저장(필터링함)
+    fscore_df = fscore_df.sort_values(by='종합점수',ascending=False)
+    return fscore_df[:num]
+
+# 모멘텀 데이터프레임만들기 함수화 ( 명심할것은 가격데이터를 판다스로 가져올때 index_col=0 으로 지정하기 )
+def get_momentum_rank(price_df,index_date,date_range,num): 
+    # price_df : 가격데이터 데이터프레임, index_date : 모멘텀 계산기준이 되는 날짜, date_range : 모멘텀계산날짜범위(비교대상)
+    momentum_df = pd.DataFrame(price_df.pct_change(date_range).loc[index_date])
+    momentum_df.columns=['모멘텀']
+    momentum_df['모멘텀순위'] = momentum_df['모멘텀'].rank(ascending=False)
+    momentum_df = momentum_df.sort_values(by='모멘텀순위')
+    return momentum_df[:num]
+
+
+
+# 저평가 + Fscore 함수화
+def get_value_quality(invest_df,fs_df,index_date,num):
+    value = make_value_combo(['PER','PBR','PSR','PCR'],invest_df,index_date,None)
+    quality = get_fscore(fs_df,index_date,None)
+    value_quality = pd.merge(value,quality,how='outer',right_index=True,left_index=True)
+    value_quality_filtered = value_quality[value_quality['종합점수']==3]
+    vq_df = value_quality_filtered.sort_values(by='종합순위')
+    return vq_df[:num]
+
+# 저평가 + Fscore 함수화 F-score 지표는 9개로 수정한걸 적용
+def get_value_quality_all(invest_df,fs_df,fr_df,index_date,num):
+    value_list = ['수정PBR','수정PSR(연율화)','수정PER(직전4분기)','수정PCR(연율화)']
+    value = make_value_combo(value_list,invest_df,index_date,None)
+    quality = get_fscore_all(fs_df,fr_df,index_date,None)
+    value_quality = pd.merge(value,quality,how='outer',right_index=True,left_index=True)
+    value_quality_filtered = value_quality[value_quality['종합점수']>=3]
+    vq_df = value_quality_filtered.sort_values(by='종합순위')
+    # 함수의 의미는 F-Score 3점이상을 만족하면서 value_list 순위가 좋은대로 정렬함 
+    # 즉 f-score 는 참조지표가 된다. 
+    return vq_df[:num]
