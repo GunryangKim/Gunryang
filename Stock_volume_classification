@@ -1,0 +1,149 @@
+import pandas as pd
+import Quant_rev12
+
+fs_path =r'C:\Users\gunryang\Backtest\fs_assemble_rev3.xlsx'
+fr_path =r'C:\Users\gunryang\Backtest\fr_assemble_rev3.xlsx'
+Invest_path = r'C:\Users\gunryang\Backtest\In_assemble_rev3.xlsx'
+code_data_path = r'C:\Users\gunryang\Backtest\code_data.xls'
+price_path =r'C:\Users\gunryang\Backtest\total_price_df_2009.xlsx'
+
+fs_df = Quant_rev12.get_finance_data(fs_path,code_data_path)
+fr_df = Quant_rev12.get_finance_data(fr_path,code_data_path)
+invest_df = Quant_rev12.get_finance_data(Invest_path,code_data_path)
+price_df = Quant_rev12.get_price_data(price_path)
+volume_path =r'C:\Users\gunryang\Backtest\시가총액.xlsx'
+volume_df = Quant_rev12.get_price_data(volume_path)
+
+############################################################################################
+
+#price_df 를 한번 걸려주면 될것 같다.
+def volume_distinguish(input_df, strategy_date,volume_df,volume_type,start=0,end=500): # 중소대형주 분류함수
+    
+    volume_lookup = { 1 :'대형주', 2:'중형주', 3:'소형주', 4:'임의로 정하기'}
+    volume_df = volume_df[[strategy_date]]
+    sorted_volume_df = volume_df.sort_values(by=strategy_date,ascending=False).dropna()
+    if volume_type == 1:
+        sorted_volume_df = sorted_volume_df.iloc[:100]
+        return input_df.loc[sorted_volume_df.index]
+    elif volume_type == 2:
+        sorted_volume_df = sorted_volume_df.iloc[100:300]
+        return input_df.loc[sorted_volume_df.index]
+    elif volume_type == 3:
+        sorted_volume_df = sorted_volume_df.iloc[300:]
+        return input_df.loc[sorted_volume_df.index]
+    else: 
+        sorted_volume_df = sorted_volume_df.iloc[start:end]
+        return input_df.loc[sorted_volume_df.index]
+ 
+ ########################################################################
+ 
+ 
+# 리밸런싱 함수 소/중/대형주별 분류 기능 추가
+def backtest_re(strategy, start_date, end_date, initial_money, price_df, fr_df, fs_df, num, renewal_period, delay,volume_type=1, index_name=None , fr_index=None , invest_index=None , value_type=None, value_list=None,date_range=None ):
+    # index_name 의 경우 high_roa 의 매개변수임(내버전함수임)
+    start_date = start_date
+    end_date = end_date
+    renewal_period = renewal_period
+    
+    total_df =0
+    initial_money_invest=0
+    portfolio_score =0
+    #rebalance_list = Quant_rev12.get_rebalance_period(start_date,end_date,renewal_period)
+    rebalance_list = get_rebalance_dates(start_date=start_date,end_date=end_date)
+    print('리밸런싱기간 리스트 :',rebalance_list)
+        
+    for i in range(len(rebalance_list)-1): # 내가 원하는 분기단위 갱신은 여기서 살짝 바껴야한다. 
+        this_term_start = rebalance_list[i]
+        this_term_end = rebalance_list[i+1]
+        print('리밸런싱 주기- 시작일 : ', this_term_start)
+        print('리밸런싱 주기 - 마지막일 : ', this_term_end)
+        print()
+        strategy_date =Quant_rev12.get_strategy_date(this_term_start,renewal_period,delay)
+        print('리밸런싱 재무제표기준일 :', strategy_date)
+        print()
+        
+        if strategy.__name__ == 'high_roa':
+            
+            st_df = strategy(Quant_rev12.select_code_by_price(price_df,fr_df,this_term_start),strategy_date,num,index_name='ROA(평균)')
+        elif strategy.__name__ == 'magic_formula':
+            
+            st_df = strategy(Quant_rev12.select_code_by_price(price_df,fr_df,this_term_start),Quant_rev12.select_code_by_price(price_df,invest_df,this_term_start),strategy_date, num ,fr_index='ROA(평균)',invest_index='수정PER(직전4분기)')
+            
+        elif strategy.__name__ == 'get_value_rank':
+            
+            invest_df_2 = volume_distinguish(input_df=invest_df,strategy_date=strategy_date,volume_df=volume_df,volume_type=volume_type)
+            st_df = strategy(Quant_rev12.select_code_by_price(price_df,invest_df_2,this_term_start),value_type,strategy_date,num)
+        
+        elif strategy.__name__ =='make_value_combo': # value_list 는 따로 길게 만들어야함
+            
+            st_df = strategy(value_list,Quant_rev12.select_code_by_price(price_df,invest_df,this_term_start),strategy_date,num)
+            
+        elif strategy.__name__ =='get_fscore':
+            
+            st_df = strategy(Quant_rev12.select_code_by_price(price_df,fs_df,this_term_start),strategy_date,num)
+            
+        elif strategy.__name__ =='get_fscore_all':
+            
+            st_df = strategy(Quant_rev12.select_code_by_price(price_df,fs_df,this_term_start),Quant_rev12.select_code_by_price(price_df,fr_df,this_term_start),strategy_date,num)
+        
+        elif strategy.__name__ =='get_momentum_rank':
+            
+            st_df = strategy(price_df,price_df[this_term_start].index[0],date_range,num)
+            
+        elif strategy.__name__ =='get_value_quality':
+            
+            st_df = strategy(Quant_rev12.select_code_by_price(price_df,invest_df,this_term_start),Quant_rev12.select_code_by_price(price_df,fs_df,this_term_start),strategy_date,num)
+            
+        elif strategy.__name__ =='get_value_quality_all':
+            
+            st_df = strategy(Quant_rev12.select_code_by_price(price_df,invest_df,this_term_start),Quant_rev12.select_code_by_price(price_df,fs_df,this_term_start),Quant_rev12.select_code_by_price(price_df,fr_df,this_term_start),strategy_date,num)
+           
+        # 여기서 3번에 걸쳐서 매달 리벨런싱을 하면 될듯하다. 
+        # 예를 들면 2016-6 ~ 2016-9 까지의 기간이라면 6,7,8에 대해서 모멘트 비중을 변경하면 될것이다. 
+        # 밑에서는 this_term_start 와 this_term_end 를 변경하는 for 문 구조를 넣으면 된다. 아래와 구조는 비슷하게 하면 될듯 
+        
+        
+        backtest = backtest_beta(price_df,st_df,this_term_start,this_term_end,initial_money,initial_money_invest)
+        temp_end = backtest[this_term_end].index[0]
+        backtest = backtest[:temp_end]
+        print('이 주기동안의 수익률은', (backtest['종합포트폴리오'][-1]-initial_money)/initial_money*100)
+        initial_money = backtest['종합포트폴리오'][-1]
+        
+        
+    
+        if rebalance_list[i] == start_date:
+            total_df = backtest
+        else:
+            total_df = pd.concat([total_df[:-1],backtest])
+        #print(per_backtest)
+        print('--------------------------------------------------------------------')
+        
+        ## 여기서 포트폴리오의 모멘트스코어가 들어가야한다. 
+        if i>11:
+            
+            portfolio_score = momentum_score_portfolio(total_df,rebalance_list[i])/12
+            initial_money_invest = initial_money*momentum_score_portfolio(total_df,rebalance_list[i])/12
+            print('전체포트폴리오에 대한 모멘텀은', portfolio_score)
+    
+            
+    total_df['일변화율'] = total_df['종합포트폴리오'].pct_change()
+    total_df['총변화율'] = total_df['종합포트폴리오']/total_df['종합포트폴리오'][0]-1
+    
+    
+    return total_df
+    
+    
+######################################################################
+#실행부분
+start_date = '2016-6'
+end_date = '2019-12'
+initial_money = 100000000
+strategy = Quant_rev12.get_value_rank
+strategy2 = Quant_rev12.make_value_combo
+strategy3 = Quant_rev12.get_fscore
+strategy4 = Quant_rev12.get_fscore_all
+strategy5 = Quant_rev12.get_value_quality_all
+
+value_list =['수정PBR','수정PSR(연율화)','수정PER(직전4분기)','수정PCR(연율화)']
+back_test_result1 = backtest_re(strategy, start_date,end_date, initial_money=initial_money, price_df=price_df, fr_df=fr_df, fs_df=fs_df,\
+                               num=20, value_type = '수정PER(직전4분기)',renewal_period =3, delay =3, volume_type=1 )
